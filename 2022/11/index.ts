@@ -3,7 +3,7 @@ import {readFileSync} from 'fs'
 type WorryLevel = number
 type MonkeyIndex = number
 
-// shows how your worry level changes as that monkey inspects an item
+// how your worry level changes as that monkey inspects an item
 type Operation = (current: WorryLevel) => WorryLevel
 
 type Next = (current: WorryLevel) => MonkeyIndex
@@ -15,6 +15,7 @@ class Monkey {
   // your worry level for each item the monkey is currently holding in the order they will be inspected
   itemQ: Array<WorryLevel>
 
+  divisor: number
   operation: Operation
 
   test: Next
@@ -34,8 +35,12 @@ class Monkey {
 
     let level = this.operation(item)
 
+    // Part I:
     // Monkey gets bored with item. Worry level is divided by 3
-    level = Math.floor(level / 3)
+    //level = Math.floor(level / 3)
+
+    // Part II:
+    level %= masterDivisor
 
     const nextMonkey = this.test(level)
 
@@ -47,22 +52,30 @@ class Monkey {
   }
 }
 
-const monkeys: Monkey[] = readNotes('./notes-sample.txt')
-//console.log({monkeys})
+const monkeys: Monkey[] = makeMonkeys('./notes.txt')
 
-for (let round = 1; round <= 20; round++) {
+// Each monkey divides the worry level by a certain amount, so math
+// with work "modulo" that amount for that monkey. To make modulo math
+// work for ALL monkeys, we simply need a least common multiple... or
+// in this case, not even the last common... just all those divisors multiple
+// together.
+const masterDivisor = monkeys.reduce((a, m) => a * m.divisor, 1)
+
+for (let round = 1; round <= 10000; round++) {
 
   monkeys.forEach(monkey => monkey.inspect())
+  if (round % 1000 === 0) {
+    console.log('After Round ', round)
+    monkeys.forEach(monkey => console.log(monkey.toString()))
 
-  console.log('After Round ', round)
-  monkeys.forEach(monkey => console.log(monkey.toString()))
+  }
 }
 
-const inspections  = monkeys.map(m => m.inspectionCount).sort((a,b) => b-a)
+const inspections = monkeys.map(m => m.inspectionCount).sort((a, b) => b - a)
 console.log(inspections)
 console.log(inspections[0] * inspections[1])
 
-function readNotes(fileName: string) {
+function makeMonkeys(fileName: string) {
 
   return readFileSync(fileName)
     .toString()
@@ -79,13 +92,14 @@ function readNotes(fileName: string) {
       }
 
       // Test: divisible by 19
-      const divisor = Number(lines[3].match(/(\d+)/)[1])
+      monkey.divisor = Number(lines[3].match(/(\d+)/)[1])
       // If true: throw to monkey 2
       const ifTrue = Number(lines[4].match(/(\d+)/)[1])
       // If false: throw to monkey 2
       const ifFalse = Number(lines[5].match(/(\d+)/)[1])
 
-      monkey.test = lev => (lev % divisor === 0 ? ifTrue : ifFalse)
+
+      monkey.test = lev => (lev % monkey.divisor === 0 ? ifTrue : ifFalse)
 
       return monkey
     })
