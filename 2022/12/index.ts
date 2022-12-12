@@ -12,88 +12,145 @@ const input = readFileSync('./grid.txt').toString()
 
 type Height = string // letter
 type Index = number
-type Coordinate = { x: Index, y: Index }
-type Path = Array<Coordinate>
+type Coord = { x: Index, y: Index }
+type CoordStr = string
+type Path = Array<CoordStr>
 type Grid = Array<Array<Height>>
-
-const {grid, currentLoc} = readGrid(input)
-
-console.log('should return single path', JSON.stringify(findPaths({x: 5, y: 2}, grid)))
-const twoLong = findPaths({x: 4, y: 2}, grid).map(p => p.length);
-console.log('2: ', JSON.stringify(twoLong))
+type Links = Record<string, Array<string>>
 
 
-const paths = findPaths(currentLoc, grid)
-console.log(paths.map(p => p.length).sort())
+const {grid, start, end} = readGrid(input)
+
+console.log(`Trying to go from ${start} to ${end}`)
+
+const links = calcLinks(grid, 'up');
+const goingUp = dijkstra(start, node => node === end, links)
+console.log({goingUp})
+
+const linksDn = calcLinks(grid, 'dn');
+const goingDown = dijkstra(
+  end,
+  (node) => gridValue(node) === 'a',
+  linksDn)
+console.log({goingDown})
+process.exit(0)
 
 
-function readGrid(input: string): { grid: Grid, currentLoc: Coordinate } {
-  let currentLoc = null
+function coordAsString(loc: Coord): CoordStr {
+  return `${loc.x},${loc.y}`
+}
+
+function gridValue(node: CoordStr) {
+  const [x, y] = node.split(',')
+  return grid[y][x]
+}
+
+
+interface Params {
+  currentHt: Height;
+  cell: { x: number; y: number },
+  dir: 'up' | 'dn'
+}
+
+function cellIsAccessible({currentHt, cell, dir}: Params) {
+  if (cell.y < 0 || cell.y >= grid.length) return false
+  if (cell.x < 0 || cell.x >= grid[cell.y].length) return false
+
+  let destHt = grid[cell.y][cell.x]
+  const ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
+  const htChange = dir == 'up' ?
+    ALPHABET.indexOf(destHt) - ALPHABET.indexOf(currentHt) :
+    ALPHABET.indexOf(currentHt) - ALPHABET.indexOf(destHt)
+  return (htChange <= 1)
+}
+
+
+function readGrid(input: string): { grid: Grid, start: CoordStr, end: CoordStr } {
+  let start = null
+  let end = null
   const grid = input
     .split('\n')
     .map(line => line.split(''))
     .map((row, y) =>
       row.map((ht, x) => {
         if (ht === 'S') {
-          currentLoc = {x, y}
+          start = coordAsString({x, y})
           return 'a'
+        }
+        if (ht === 'E') {
+          end = coordAsString({x, y})
+          return 'z'
         }
         return ht
       }))
 
-  return {grid, currentLoc}
+  return {grid, start, end}
 }
 
-interface CellIsAccessibleParams {
-  currentHt: Height;
-  grid: Grid;
-  cell: { x: number; y: number },
-  visited: Array<string>
+
+function calcLinks(grid: Grid, dir: 'up' | 'dn'): Links {
+  const links: Links = {};
+
+  function calcNexts(loc: { x: number; y: number }, dir: 'up' | 'dn'): Array<string> {
+    let currentHt = grid[loc.y][loc.x]
+    const nextCells = [
+      {x: loc.x, y: loc.y - 1},
+      {x: loc.x, y: loc.y + 1},
+      {x: loc.x + 1, y: loc.y},
+      {x: loc.x - 1, y: loc.y}
+    ].filter(cell => cellIsAccessible({currentHt, cell, dir}))
+    return nextCells.map(coordAsString)
+  }
+
+  for (let row = 0; row < grid.length; row++)
+    for (let col = 0; col < grid[row].length; col++) {
+      const loc = {x: col, y: row};
+      const validNexts = calcNexts({x: col, y: row}, dir)
+      links[coordAsString(loc)] = validNexts
+    }
+
+  return links
 }
 
-function cellIsAccessible({currentHt, cell, grid, visited}: CellIsAccessibleParams) {
-  if (visited.includes(coordAsString(cell))) return false
-  if (cell.y < 0 || cell.y >= grid.length) return false
-  if (cell.x < 0 || cell.x >= grid[cell.y].length) return false
 
-  let cellValue = grid[cell.y][cell.x]
-  // console.log ( '    ' + currentHt + ' -> ? ' + cellValue)
-  if (cellValue == 'E') cellValue = 'z'
-  const ALPHABET = 'abcdefghijklmnopqrstuvwxyz'
-  const htChange = ALPHABET.indexOf(cellValue) - ALPHABET.indexOf(currentHt)
-  return (htChange <= 1) // htChange >= 0 &&
-}
+// https://www.freecodecamp.org/news/dijkstras-shortest-path-algorithm-visual-introduction/
+function dijkstra(start: CoordStr, end: (n: CoordStr) => boolean, edges: Links): number {
+  const unvisited = new Set(Object.keys(edges))
+  const distance = {} as Record<CoordStr, number>
 
-function coordAsString(loc: Coordinate) {
-  return `${loc.x},${loc.y}`
-}
+  distance[start] = 0
+  while (unvisited.size) {
 
-function findPaths(
-  loc: Coordinate,
-  grid,
-  visited: Array<string> = []): Array<Path> {
+    const nearestUnvisitedNode =
+      [...unvisited]
+        .reduce((best, n) => {
+          if (!distance.hasOwnProperty(n)) return best // no distance yet?
+          if (!distance.hasOwnProperty(best)) return n // no best distance?
+          return distance[n] < distance[best] ? n : best;
+        }, unvisited[0])
 
-  const currentHt = grid[loc.y][loc.x]
-  if (currentHt === 'E')
-    return [[loc]]
+    visit(nearestUnvisitedNode)
 
-  let paths = []
+    if (end(nearestUnvisitedNode))
+      return distance[nearestUnvisitedNode];
+  }
 
-  const nextCells = [
-    {x: loc.x, y: loc.y - 1},
-    {x: loc.x, y: loc.y + 1},
-    {x: loc.x + 1, y: loc.y},
-    {x: loc.x - 1, y: loc.y}
-  ].filter(cell => cellIsAccessible({currentHt, cell, grid, visited}))
+  return Infinity
 
-  nextCells.forEach(cell => {
-    //console.log(`from ${coordAsString(loc)} consider ${coordAsString(cell)} after ${visited.join('->')}`)
-    findPaths(
-      cell,
-      grid,
-      [...visited, coordAsString(loc)])
-      .forEach(nextPath => paths.push([coordAsString(loc), ...nextPath]))
-  })
+  function visit(node: CoordStr) {
+    unvisited.delete(node)
 
-  return paths
+    // we are visiting because we know we have the shortest path!
+    const toHere = distance[node]
+
+    // looking through all our links, replace any that are longer than through this node
+    edges[node].forEach(n => {
+      if (!distance.hasOwnProperty(n) ||
+        (toHere + 1) < distance[n])
+        distance[n] = toHere + 1
+    })
+
+  }
+
+
 }
