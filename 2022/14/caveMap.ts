@@ -9,8 +9,8 @@ export class CaveMap {
   endlessVoid = true
 
   addRockLine(aStr: PointStr, bStr: PointStr) {
-    this.rocks.add(aStr)
-    this.rocks.add(bStr)
+    this.addRock(aStr)
+    this.addRock(bStr)
     const a = toPoint(aStr)
     const b = toPoint(bStr)
     const Xs = [a[0], b[0]].sort(numberSort)
@@ -18,9 +18,13 @@ export class CaveMap {
 
     for (let x = Xs[0]; x <= Xs[1]; x++)
       for (let y = Ys[0]; y <= Ys[1]; y++)
-        this.rocks.add(toPointStr([x, y]))
+        this.addRock([x, y]);
 
     this._maxY = undefined // reset cache
+  }
+
+  private addRock(p: Point | PointStr) {
+    this.rocks.add(asPointStr(p))
   }
 
   get rockBottom(): number {
@@ -103,4 +107,10 @@ function toPoint(s: PointStr) {
 
 function toPointStr(p: Point) {
   return `${p[0]},${p[1]}`
+}
+
+function asPointStr(p: Point | PointStr) : PointStr {
+  if (Array.isArray(p))
+    return toPointStr(p)
+  return p
 }
