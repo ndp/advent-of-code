@@ -2,7 +2,7 @@ import {readFileSync} from 'fs'
 
 type Valve = { name: string, flow: number; paths: Array<string> };
 const valveMap =
-  readFileSync('./sample-data.txt')
+  readFileSync('./data.txt')
     .toString()
     .split('\n')
     .filter(line => !!line)
@@ -22,7 +22,7 @@ const valveMap =
 // console.log(valveMap)
 
 
-const cache = new Map<string, [number, Array<string>]>()
+const cache = new Map<string, [string, number]>()
 
 let here = 'AA'
 const LAST_MINUTE = 30
@@ -34,91 +34,66 @@ for (let minute = 1; minute <= LAST_MINUTE; minute++) {
 
   console.log(`Minute ${minute} @ ${here}`)
 
-  const [score, steps] = bestChoiceFor(
-    minute,
-    here,
-    openValves,
-    Math.min(LAST_MINUTE - minute, 29)
-  )
+  const [step] = calcBestStep(
+    minute, here, openValves)
 
-  if (minute === 1)
-    console.log({steps})
-
-  if (steps[0] === 'OPEN') {
+  if (step == 'OPEN') {
     console.log(`  Open the valve ${here} at flow rate ${valve.flow} for a win of ${valve.flow * (LAST_MINUTE - minute)}`)
-    totalFlowage += valve.flow * (LAST_MINUTE - minute)
     openValves.push(here)
-
-    minute++
-    console.log(`Minute ${minute} @ ${here}`)
-    moveTo(steps[1])
+    totalFlowage += valve.flow * (LAST_MINUTE - minute)
   } else {
-    moveTo(steps[0])
+    console.log(`  Moving to ${step}`)
+    here = step
   }
 }
-
-function moveTo(valve) {
-  console.log(`  Moving to ${valve}`)
-  here = valve
-}
-
 
 console.log('**** TOTAL FLOWAGE: ', totalFlowage, '(want 1651)')
 
-
-
-function bestChoiceFor(
+function calcBestStep(
   minute: number,
   whereWeAre: string,
-  openValves: Array<string>,
-  lookAheadSteps: number): [number, Array<string>] {
+  opened: Array<string>): [string, number] {
 
-  if (lookAheadSteps <= 0) return [0, []]
+  if (minute > LAST_MINUTE) return ['?', 0]
 
-  const cacheKey = `${minute} ${whereWeAre} ${openValves.join(',')}`
-  if (!cache.has(cacheKey)) {
-
-    const valve = valveMap[whereWeAre]
-
-    let bestScore = -1
-    let bestSteps = [] as Array<string>
-
-    // What we might get if we don't open the valve
-    valve.paths.forEach(path => {
-      const [score, steps] =
-        bestChoiceFor(
-          minute + 1,
-          path,
-          [...openValves],
-          lookAheadSteps - 1)
-      if (score > bestScore) {
-        bestSteps = [path, ...steps]
-        bestScore = score
-      }
-    })
-
-    if (!openValves.includes(valve.name)) {
-
-      // take a minute to open the valve
-      const valveScore = valve.flow * (LAST_MINUTE - minute)
-
-      valve.paths.forEach(path => {
-        const [score, steps] =
-          bestChoiceFor(
-            minute + 2,
-            path,
-            [...openValves, whereWeAre],
-            lookAheadSteps - 2)
-        if ((score + valveScore) > bestScore) {
-          bestScore = score + valveScore
-          bestSteps = ['OPEN', path, ...steps]
-        }
-      })
-    }
-    cache.set(cacheKey, [bestScore, bestSteps])
-  // } else {
-  //   console.log('cache hit!')
+  const cacheKey = `${minute} ${whereWeAre} ${opened.join(',')}`
+  if (cache.has(cacheKey)) {
+    // console.log('pulling from cache', cacheKey)
+    return cache.get(cacheKey)
   }
 
-  return cache.get(cacheKey)
+  const valve = valveMap[whereWeAre]
+
+  let bestScore = -1
+  let bestStep = ''
+
+  // What we might get if we don't open the valve
+  valve.paths.forEach(path => {
+    const [step, score] =
+      calcBestStep(
+        minute + 1,
+        path,
+        [...opened])
+    if (score > bestScore) {
+      bestStep = path
+      bestScore = score
+    }
+  })
+
+  if (!opened.includes(valve.name) && valve.flow > 0) {
+
+    // take a minute to open the valve
+    let [_, score] =
+      calcBestStep(
+        minute + 1,
+        whereWeAre, // not moving
+        [...opened, whereWeAre])
+    score += valve.flow * (LAST_MINUTE - minute)
+    if (score > bestScore) {
+      bestStep = 'OPEN'
+      bestScore = score
+    }
+  }
+  cache.set(cacheKey, [bestStep, bestScore])
+  return [bestStep, bestScore]
 }
