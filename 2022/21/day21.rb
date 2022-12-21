@@ -20,35 +20,26 @@ FOO
 
 BIG_SCRIPT = File.open("/Users/ndp/workspace/advent-of-code/2022/21/big_script.txt").read
 
-NUMBERS, EXPR =
+COMMANDS =
   BIG_SCRIPT
     .split("\n")
     .reject { |line| line == "" }
     .map { |line| line.split(': ') }
-    .partition { |(name, value)|
-      !!Integer(value) rescue false }
+    .map { |name, expr|
+      ["@#{name}", expr.gsub(/(\w\w\w\w)/, '@\1')]}
 
 playground = Object.new
-
-NUMBERS.each do |(name, value)|
-  playground.instance_eval("@#{name} = #{value}")
-end
-
-EXPR.map! do |name, expr|
-  ["@#{name}", expr.gsub(/(\w\w\w\w)/, '@\1')]
-end
-
 while (!playground.instance_variable_defined?('@root')) do
-  EXPR.each do |(name, value)|
+  COMMANDS.each do |(name, value)|
     next if playground.instance_variable_defined?(name.to_sym)
     begin
       playground.instance_eval("#{name} = #{value}")
     rescue NameError, NoMethodError, NilClass, TypeError
       playground.instance_eval("#{name} = nil")
       playground.remove_instance_variable(name)
-      # puts 'NO', "#{name} = #{value}"
     end
   end
 end
 
-pp "Root monkey yells: ": playground.instance_variable_get('@root')
+pp "Root monkey yells": playground.instance_variable_get('@root')
+pp "Expected:        ": 324122188240430
