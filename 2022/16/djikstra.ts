@@ -1,22 +1,25 @@
-
 // https://www.freecodecamp.org/news/dijkstras-shortest-path-algorithm-visual-introduction/
 
-type CoordStr = string
+type NodeId = string
+export type Links = Record<NodeId, Record<NodeId, number>>
 
-export function dijkstra(start: CoordStr, end: (n: CoordStr) => boolean, edges: Links): number {
-  const unvisited = new Set(Object.keys(edges))
-  const distance = {} as Record<CoordStr, number>
+export function shortestPath(
+  start: NodeId,
+  end: NodeId | ((n: NodeId) => boolean),
+  nodes: Links): number {
+
+  // If `end` is passed in a  value, convert it to a function
+  if (typeof end !== 'function')
+    end = ((endValue) => (n: NodeId) => n === endValue)(end)
+
+  const unvisited = new Set(Object.keys(nodes))
+  const distance = {} as Record<NodeId, number>
 
   distance[start] = 0
+
   while (unvisited.size) {
 
-    const nearestUnvisitedNode =
-      [...unvisited]
-        .reduce((best, n) => {
-          if (!distance.hasOwnProperty(n)) return best // no distance yet?
-          if (!distance.hasOwnProperty(best)) return n // no best distance?
-          return distance[n] < distance[best] ? n : best;
-        }, unvisited[0])
+    const nearestUnvisitedNode = getNearestUnvisitedNode();
 
     visit(nearestUnvisitedNode)
 
@@ -26,19 +29,33 @@ export function dijkstra(start: CoordStr, end: (n: CoordStr) => boolean, edges: 
 
   return Infinity
 
-  function visit(node: CoordStr) {
-    unvisited.delete(node)
+  function visit(visiting: NodeId) {
+    unvisited.delete(visiting)
 
     // we are visiting because we know we have the shortest path!
-    const toHere = distance[node]
+    const toHere = distance[visiting]
 
     // looking through all our links, replace any that are longer than through this node
-    edges[node].forEach(n => {
-      if (!distance.hasOwnProperty(n) ||
-        (toHere + 1) < distance[n])
-        distance[n] = toHere + 1
-    })
+    const outboundDistances = nodes[visiting];
+    const outboundNodes = Object.keys(outboundDistances);
 
+    outboundNodes.forEach(n => {
+
+      const distanceViaOutbound = toHere + outboundDistances[n];
+
+      if (!distance.hasOwnProperty(n)
+        || distanceViaOutbound < distance[n])
+        distance[n] = distanceViaOutbound
+    })
+  }
+
+  function getNearestUnvisitedNode() {
+    return [...unvisited]
+      .reduce((best, n) => {
+        if (!distance.hasOwnProperty(n)) return best // no distance yet?
+        if (!distance.hasOwnProperty(best)) return n // no best distance?
+        return distance[n] < distance[best] ? n : best;
+      })
   }
 
 
