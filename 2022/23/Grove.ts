@@ -8,6 +8,8 @@ export enum Direction {
   Max
 }
 
+const cache = {}
+
 export class Grove {
 
   elves: Set<Scoord>
@@ -37,7 +39,7 @@ export class Grove {
     return map
   }
 
-  round(direction: Direction) {
+  round(direction: Direction): boolean {
     // First half
     const potentials = this.potentialMoves(direction);
 
@@ -47,13 +49,21 @@ export class Grove {
     }, {})
 
     // Second half, resolve positions
-    const newPositions = potentials
+    const actualMoves = potentials
       .map(
         ([from, dest]) =>
-          destinationCounts[dest] > 1 ? from : dest)
+          [from, destinationCounts[dest] > 1 ? from : dest])
 
-    this.elves.clear()
-    this.elves = new Set(newPositions)
+    let movedOne = false
+    actualMoves
+      .forEach(([from, dest]) => {
+        if (from !== dest) {
+          movedOne = true
+          this.elves.delete(from)
+          this.elves.add(dest)
+        }
+      })
+    return !movedOne
   }
 
   emptyGroundTiles() {
@@ -106,15 +116,20 @@ export class Grove {
 
   threeCoordsFrom(coord: Scoord, dir: Direction) {
 
+    const cacheKey = `${coord}/${dir}`
+    if (cache[cacheKey]) return cache[cacheKey]
+
     const baseRow = scoordRow(coord)
     const baseColumn = scoordColumn(coord)
 
-    return [-1, 0, 1]
+    const result = [-1, 0, 1]
       .map(offset =>
         (dir === Direction.N || dir === Direction.S)
           ? asScoord({row: baseRow + (dir === Direction.N ? -1 : 1), column: baseColumn + offset})
           : asScoord({row: baseRow + offset, column: baseColumn + (dir === Direction.W ? -1 : 1)})
-      )
+      );
+    cache[cacheKey] = result
+    return result
   }
 
   get top() {

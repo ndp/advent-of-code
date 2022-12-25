@@ -17,11 +17,16 @@ console.log('== Initial State ==')
 console.log(g.draw())
 console.log()
 
-for (let round = 0; round < 10; round++) {
+for (let round = 0; round < 10000; round++) {
   console.log('== End of Round ', round+1, '  Direction: ', directionForRound(round))
-  g.round(directionForRound(round))
+  const isStatic = g.round(directionForRound(round))
   console.log(g.draw())
   console.log()
+  if (isStatic) {
+    console.log('NO MOVEMENT DETECTED')
+    console.log('ROUND #', round + 1)
+    break
+  }
 }
 
 console.log('Empty ground tiles: ', g.emptyGroundTiles(), ' expect 110')
